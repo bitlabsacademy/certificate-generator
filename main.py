@@ -1,71 +1,103 @@
+from textwrap import wrap
 from time import time
 
 import pandas as pd
 from PIL import Image, ImageColor, ImageDraw, ImageFont
 
-start = time()
-data_filename = "data/names/wds09201.csv"
-certif_filename = "data/certificates/wds09201.png"
-# names = ["Vincent Nelwan", "Achmad Maulana Dzaky"]
-names = pd.read_csv(
-    data_filename,
-    # parse_dates=["Start Date (UTC)", "Submit Date (UTC)"]
-)
-# names = names[names["Eligible for Sertif?"] == "Y"]
-names.sort_values("Submitted At", inplace=True)
-certid_prefix = "WDS09201{:03}"
+import config as c
 
-# set font type and color for name
-font_name = ImageFont.truetype(
-    "data/fonts/Epilogue/Epilogue-SemiBold.ttf",
-    size=2*22
-)
-color_name = ImageColor.getrgb("#192256")
 
-# set font type and color for certificate ID
-font_certid = ImageFont.truetype(
-    "data/fonts/Space_Mono/SpaceMono-Regular.ttf",
-    size=2*10
-)
-color_certid = ImageColor.getrgb("#434B75")
+def main():
+    start = time()
 
-certificate = Image.open(certif_filename)
-drawer = ImageDraw.Draw(certificate)
+    # load certifcates data
+    df_certif = pd.read_csv(c.CERT_FILENAME)
+    df_certif.drop(columns=["voucher_code", "certif_link"], inplace=True)
+    df_certif["student_name"] = df_certif["student_name"].apply(
+        lambda name: name.title()
+    )
 
-image_width, image_height = certificate.size
+    df_certif.apply(write_certificate, axis=1)
+    print("Done generating all {} certificates in {:.2f}s".format(
+        df_certif.shape[0], time() - start
+    ))
 
-print("Generating {} certificates".format(names.shape[0]))
-for idx, name in enumerate(names["Nama Lengkap"]):
-# for idx, name in enumerate(names.head()):
-    if (idx+1) % 50 == 0:
-        print(f"Done generating {idx+1} certificates..")
-    certificate = Image.open(certif_filename)
+def write_certificate(row):
+    if row["student_name"] != "Sitti Hadira Nur Alifya":
+        continue
+    certif_type = "graduation"
+    if row.certif_type == "penyelesaian":
+        certif_type = "completion"
+
+    if row.class_title == "Raih penghasilan jutaan dari Instagram":
+        certif_type = "old"
+
+    if certif_type == "completion":
+        template = c.CERT_COMPLETION_TEMPLATE
+    elif certif_type == "graduation":
+        template = c.CERT_GRADUATION_TEMPLATE
+    else:
+        template = c.CERT_OLD_TEMPLATE
+
+    certificate = Image.open(template)
     drawer = ImageDraw.Draw(certificate)
 
-    name_width, name_height = drawer.textsize(name.title(), font=font_name)
-    certid_full = certid_prefix.format(idx+1)
-    # certid_full = certid_prefix
-    certid_width, certid_height = drawer.textsize(
-        certid_full, font=font_certid
-    )
-    drawer.text(
-        (image_width / 8, image_height / 2.68),
-        text=name.title(),
-        anchor="la",
-        font=font_name,
-        fill=color_name
-    )
-    drawer.text(
-        (image_width / 8.5, image_height / 1.2),
-        text=certid_full,
-        anchor="la",
-        font=font_certid,
-        fill=color_certid
-    )
+    for location in c.DICT_FONT_STYLE[certif_type].keys():
+        if location == "competency_list":
+            competency_file = (c.COMPETENCY_DIR / row.class_title)
+            with competency_file.open("r") as f:
+                text = [
+                    "\n".join(wrap(line))
+                    for line in f
+                ]
+                if certif_type == "completion":
+                    text = "\n\n".join(text)
+                else:
+                    text = "\n".join(text)
+        else:
+            text = "\n".join(wrap(str(row[location])))
+
+        font_dir = c.FONT_DIR / c.DICT_FONT_STYLE[certif_type][location][
+            "font_type"
+        font_style = ImageFont.truetype(
+            (
+                font_dir
+                / (
+                    c.DICT_FONT_STYLE[certif_type][location]["font_type"]
+                    + "-"
+                    + c.DICT_FONT_STYLE[certif_type][location]["font_style"]
+                    + ".ttf"
+                )
+            ).as_posix(),
+            size=(
+                c.DICT_FONT_STYLE[certif_type][location]["font_size"]
+                if certif_type != "completion"
+                else
+                c.DICT_FONT_STYLE[certif_type][location]["font_size"]*4
+            )
+        )
+        font_color = ImageColor.getrgb(
+            "#" + c.DICT_FONT_STYLE[certif_type][location]["font-color"]
+        )
+
+        drawer.textsize(
+            text, font=font_style
+        )
+
+        drawer.text(
+            c.DICT_FONT_STYLE[certif_type][location]["coordinate"],
+            text=text,
+            anchor="la",
+            font=font_style,
+            fill=font_color,
+        )
+
     certificate.save(
-        f"data/webinar-certificates/sep/WDS09201/{certid_full}-{name.title()}.png"
+        (
+            c.CERT_TARGET_DIR / f"dec/{row.certif_id}_{row.student_name}.png"
+        ).as_posix()
     )
 
-print("Done generating all {} certificates in {:.2f}s".format(
-    names.shape[0], time() - start
-))
+
+if __name__ == "__main__":
+    main()
