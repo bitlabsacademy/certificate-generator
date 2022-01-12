@@ -1,0 +1,3 @@
+type,name_loc,name_font_color,name_font_type,name_font_size,course_loc,course_font_color,course_font_type,course_font_size,date_loc,date_font_color,date_font_type,date_font_size,id_loc,id_font_color,id_font_type,id_font_size
+webinar,"105, 221",#192256,epilogue_semibold,22,"105, 315",#192256,epilogue_medium,14,"95, 474",#192256,epilogue_semibold,14,"98, 496",#1A1C31,spacemono_regular,10
+workshop,"105, 221",#192256,epilogue_semibold,22,"105, 315",#192256,epilogue_medium,14,"95, 474",#192256,epilogue_semibold,14,"98, 496",#1A1C31,spacemono_regular,10
